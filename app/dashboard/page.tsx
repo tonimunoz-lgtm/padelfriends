@@ -155,7 +155,7 @@ export default function DashboardPage() {
                   {opponentTeam && (
                     <div style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
                       <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent2)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
-                        🎾 Jugadores rivales
+                        🎾 Jugadores/as
                       </p>
                       <div style={{ display: 'flex', gap: 16 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
