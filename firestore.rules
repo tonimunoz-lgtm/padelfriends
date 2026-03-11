@@ -1,0 +1,59 @@
+// firestore.rules
+// Deploy with: firebase deploy --only firestore:rules
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper: check if the requesting user is admin
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Users: read own, admin reads all
+    match /users/{userId} {
+      allow read: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+      allow create: if request.auth != null;
+    }
+
+    // Teams: all authenticated users can read, only admin or team members can write
+    match /teams/{teamId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (
+        isAdmin() ||
+        resource.data.player1Id == request.auth.uid ||
+        resource.data.player2Id == request.auth.uid
+      );
+      allow create: if request.auth != null;
+    }
+
+    // Championships: all users read, only admin writes
+    match /championships/{champId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && isAdmin();
+    }
+
+    // Matches: all users read, players can update own matches, admin can write all
+    match /matches/{matchId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && isAdmin();
+      allow update: if request.auth != null && (
+        isAdmin() ||
+        // Participating teams can submit results
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.teamId in [resource.data.homeTeamId, resource.data.awayTeamId]
+      );
+      allow delete: if request.auth != null && isAdmin();
+    }
+
+    // Notifications: users read own, admin creates any
+    match /notifications/{notifId} {
+      allow read: if request.auth != null && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && isAdmin();
+    }
+  }
+}
