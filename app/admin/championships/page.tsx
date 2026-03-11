@@ -2,9 +2,42 @@
 import { useState, useEffect } from 'react';
 import { getAllTeams, getChampionships, createChampionship, updateChampionship, generateRoundRobin, createMatch } from '@/lib/firestore';
 import { Team, Championship } from '@/types';
-import { Trophy, ChevronLeft, Plus, Play, Pause, CheckCircle, X, Zap } from 'lucide-react';
+import { Trophy, ChevronLeft, Plus, Play, CheckCircle, X, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { Timestamp } from 'firebase/firestore';
+
+interface ChampForm {
+  name: string;
+  season: string;
+  startDate: string;
+  description: string;
+}
+
+// ✅ Fuera del componente para evitar re-renders
+function ChampFormFields({ data, onChange }: { data: ChampForm; onChange: (k: keyof ChampForm, v: string) => void }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div>
+        <label className="label">Nombre</label>
+        <input className="input" value={data.name} onChange={e => onChange('name', e.target.value)} placeholder="Liga Primavera 2025" />
+      </div>
+      <div>
+        <label className="label">Temporada</label>
+        <input className="input" value={data.season} onChange={e => onChange('season', e.target.value)} placeholder="2025" />
+      </div>
+      <div>
+        <label className="label">Fecha de inicio</label>
+        <input className="input" type="date" value={data.startDate} onChange={e => onChange('startDate', e.target.value)} />
+      </div>
+      <div>
+        <label className="label">Descripción (opcional)</label>
+        <textarea className="input" value={data.description} onChange={e => onChange('description', e.target.value)} rows={2} style={{ resize: 'vertical' }} />
+      </div>
+    </div>
+  );
+}
+
+const emptyChampForm: ChampForm = { name: '', season: '', startDate: '', description: '' };
 
 export default function AdminChampionshipsPage() {
   const [championships, setChampionships] = useState<Championship[]>([]);
@@ -14,10 +47,9 @@ export default function AdminChampionshipsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [selectedChamp, setSelectedChamp] = useState<Championship | null>(null);
-
-  const [form, setForm] = useState({ name: '', season: '', startDate: '', description: '' });
+  const [form, setForm] = useState<ChampForm>({ ...emptyChampForm });
   const [selectedTeams, setSelectedTeams] = useState<string[]>([]);
-  const [matchDay, setMatchDay] = useState(6); // Saturday
+  const [matchDay, setMatchDay] = useState(6);
   const [matchTime, setMatchTime] = useState('10:00');
 
   useEffect(() => {
@@ -33,7 +65,7 @@ export default function AdminChampionshipsPage() {
   async function handleCreate() {
     if (!form.name || !form.season) return showToast('Nombre y temporada son obligatorios');
     try {
-      const id = await createChampionship({
+      await createChampionship({
         name: form.name,
         season: form.season,
         startDate: form.startDate ? new Date(form.startDate) as unknown as Date : new Date() as unknown as Date,
@@ -43,8 +75,9 @@ export default function AdminChampionshipsPage() {
         totalRounds: 0,
         description: form.description,
       });
-      showToast('✓ Campeonato creado en borrador');
+      showToast('✓ Campeonato creado');
       setShowCreate(false);
+      setForm({ ...emptyChampForm });
       const updated = await getChampionships();
       setChampionships(updated);
     } catch { showToast('Error al crear'); }
@@ -57,13 +90,13 @@ export default function AdminChampionshipsPage() {
     try {
       const champTeams = teams.filter(t => selectedTeams.includes(t.id));
       const pairings = generateRoundRobin(champTeams);
-      const startDate = champ.startDate instanceof Timestamp ? champ.startDate.toDate() : new Date(champ.startDate || Date.now());
+      const startDate = champ.startDate instanceof Timestamp
+        ? champ.startDate.toDate()
+        : new Date(champ.startDate || Date.now());
 
-      // Create all matches
       for (const pairing of pairings) {
         const matchDate = new Date(startDate);
         matchDate.setDate(matchDate.getDate() + (pairing.round - 1) * 7);
-        // Set to selected day of week
         const currentDay = matchDate.getDay();
         const diff = (matchDay - currentDay + 7) % 7;
         matchDate.setDate(matchDate.getDate() + diff);
@@ -107,7 +140,7 @@ export default function AdminChampionshipsPage() {
   async function handleStatusChange(champ: Championship, status: Championship['status']) {
     await updateChampionship(champ.id, { status });
     setChampionships(prev => prev.map(c => c.id === champ.id ? { ...c, status } : c));
-    showToast(`✓ Estado actualizado: ${status}`);
+    showToast(`✓ Estado: ${status}`);
   }
 
   const statusConfig = {
@@ -121,16 +154,20 @@ export default function AdminChampionshipsPage() {
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Link href="/admin" style={{ color: 'var(--text2)', display: 'flex' }}><ChevronLeft size={20} /></Link>
-          <h1 style={{ fontSize: 20, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}><Trophy size={20} color="var(--accent3)" /> Campeonatos</h1>
+          <h1 style={{ fontSize: 20, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Trophy size={20} color="var(--accent3)" /> Campeonatos
+          </h1>
         </div>
-        <button onClick={() => setShowCreate(true)} className="btn-primary" style={{ width: 'auto', padding: '8px 16px', fontSize: 13 }}>
+        <button onClick={() => { setForm({ ...emptyChampForm }); setShowCreate(true); }} className="btn-primary" style={{ width: 'auto', padding: '8px 16px', fontSize: 13 }}>
           <Plus size={15} /> Nuevo
         </button>
       </div>
 
       <div style={{ padding: '16px' }}>
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}><div className="loader" style={{ width: 36, height: 36 }} /></div>
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
+            <div className="loader" style={{ width: 36, height: 36 }} />
+          </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {championships.map(champ => {
@@ -186,12 +223,7 @@ export default function AdminChampionshipsPage() {
               <h3 style={{ fontSize: 18, fontWeight: 700 }}>Nuevo campeonato</h3>
               <button onClick={() => setShowCreate(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)' }}><X size={20} /></button>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div><label className="label">Nombre</label><input className="input" value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Liga Primavera 2025" /></div>
-              <div><label className="label">Temporada</label><input className="input" value={form.season} onChange={e => setForm(p => ({ ...p, season: e.target.value }))} placeholder="2025" /></div>
-              <div><label className="label">Fecha de inicio</label><input className="input" type="date" value={form.startDate} onChange={e => setForm(p => ({ ...p, startDate: e.target.value }))} /></div>
-              <div><label className="label">Descripción (opcional)</label><textarea className="input" value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={2} /></div>
-            </div>
+            <ChampFormFields data={form} onChange={(k, v) => setForm(prev => ({ ...prev, [k]: v }))} />
             <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
               <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowCreate(false)}>Cancelar</button>
               <button className="btn-primary" style={{ flex: 2 }} onClick={handleCreate}>✓ Crear</button>
@@ -208,7 +240,7 @@ export default function AdminChampionshipsPage() {
               <h3 style={{ fontSize: 18, fontWeight: 700 }}>Generar emparejamientos</h3>
               <button onClick={() => setSelectedChamp(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)' }}><X size={20} /></button>
             </div>
-            <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 20 }}>{selectedChamp.name} — Selecciona los equipos participantes</p>
+            <p style={{ color: 'var(--text2)', fontSize: 13, marginBottom: 20 }}>{selectedChamp.name}</p>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
               <div>
@@ -235,7 +267,7 @@ export default function AdminChampionshipsPage() {
                     onClick={() => setSelectedTeams(prev => isSelected ? prev.filter(id => id !== team.id) : [...prev, team.id])}
                     style={{ padding: '12px 16px', background: isSelected ? 'rgba(0,229,160,0.1)' : 'var(--surface2)', border: `1px solid ${isSelected ? 'rgba(0,229,160,0.4)' : 'var(--border)'}`, borderRadius: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10 }}
                   >
-                    <div style={{ width: 20, height: 20, borderRadius: 4, background: isSelected ? 'var(--accent)' : 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ width: 20, height: 20, borderRadius: 4, background: isSelected ? 'var(--accent)' : 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       {isSelected && <CheckCircle size={14} color="#000" />}
                     </div>
                     <div style={{ flex: 1 }}>
@@ -250,7 +282,11 @@ export default function AdminChampionshipsPage() {
             {selectedTeams.length >= 2 && (
               <div className="card-sm" style={{ background: 'rgba(0,229,160,0.08)', border: '1px solid rgba(0,229,160,0.2)', marginBottom: 16 }}>
                 <p style={{ fontSize: 13, color: 'var(--text2)' }}>
-                  Se generarán <strong style={{ color: 'var(--accent)' }}>{generateRoundRobin(teams.filter(t => selectedTeams.includes(t.id))).length} partidos</strong> en <strong style={{ color: 'var(--accent)' }}>{selectedTeams.length % 2 === 0 ? selectedTeams.length - 1 : selectedTeams.length} jornadas</strong>
+                  Se generarán <strong style={{ color: 'var(--accent)' }}>
+                    {generateRoundRobin(teams.filter(t => selectedTeams.includes(t.id))).length} partidos
+                  </strong> en <strong style={{ color: 'var(--accent)' }}>
+                    {selectedTeams.length % 2 === 0 ? selectedTeams.length - 1 : selectedTeams.length} jornadas
+                  </strong>
                 </p>
               </div>
             )}
