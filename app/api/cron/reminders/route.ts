@@ -31,7 +31,7 @@ async function sendReminderEmail(to: string, playerName: string, matchData: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from: 'Padel Friends <notificaciones@padelFriends.com>',
+      from: 'Padel Friends <onboarding@resend.dev>',
       to,
       subject: `⏰ Partido mañana: ${matchData.homeTeam} vs ${matchData.awayTeam}`,
       html: `
