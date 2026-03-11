@@ -4,9 +4,8 @@ import { useAuth } from '@/context/AuthContext';
 import { getActiveChampionship, getMatchesByTeam, getTeam, getStandings } from '@/lib/firestore';
 import { Championship, Match, Team, Standings } from '@/types';
 import { formatDayName, formatDate, toDate } from '@/lib/utils';
-import { MapPin, Clock, Trophy, ChevronRight, Zap, Target, Activity } from 'lucide-react';
+import { MapPin, Clock, Trophy, Zap, Target, Activity, User } from 'lucide-react';
 import Link from 'next/link';
-import { Timestamp } from 'firebase/firestore';
 
 export default function DashboardPage() {
   const { userProfile } = useAuth();
@@ -14,11 +13,10 @@ export default function DashboardPage() {
   const [myTeam, setMyTeam] = useState<Team | null>(null);
   const [matches, setMatches] = useState<Match[]>([]);
   const [standings, setStandings] = useState<Standings[]>([]);
+  const [opponentTeams, setOpponentTeams] = useState<Record<string, Team>>({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-  }, [userProfile]);
+  useEffect(() => { loadData(); }, [userProfile]);
 
   async function loadData() {
     try {
@@ -32,10 +30,28 @@ export default function DashboardPage() {
         ]);
         setMyTeam(team);
         setMatches(teamMatches);
+
         if (champ) {
           const s = await getStandings(champ.id);
           setStandings(s);
         }
+
+        // Cargar datos de equipos rivales para los próximos partidos
+        const now = new Date();
+        const upcoming = teamMatches
+          .filter(m => toDate(m.scheduledDate) > now && m.status === 'scheduled')
+          .slice(0, 3);
+
+        const opponentIds = upcoming.map(m =>
+          m.homeTeamId === userProfile.teamId ? m.awayTeamId : m.homeTeamId
+        );
+
+        const opponentData: Record<string, Team> = {};
+        await Promise.all(opponentIds.map(async id => {
+          const t = await getTeam(id);
+          if (t) opponentData[id] = t;
+        }));
+        setOpponentTeams(opponentData);
       }
     } finally {
       setLoading(false);
@@ -44,10 +60,8 @@ export default function DashboardPage() {
 
   const now = new Date();
   const upcomingMatches = matches
-    .filter(m => {
-      const d = toDate(m.scheduledDate);
-      return d > now && m.status === 'scheduled';
-    })
+    .filter(m => toDate(m.scheduledDate) > now && m.status === 'scheduled')
+    .sort((a, b) => toDate(a.scheduledDate).getTime() - toDate(b.scheduledDate).getTime())
     .slice(0, 3);
 
   const recentMatches = matches
@@ -105,6 +119,7 @@ export default function DashboardPage() {
       </div>
 
       <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 20, paddingTop: 16 }}>
+
         {/* Próximos partidos */}
         {upcomingMatches.length > 0 && (
           <div>
@@ -116,28 +131,63 @@ export default function DashboardPage() {
             </div>
             {upcomingMatches.map(match => {
               const isHome = match.homeTeamId === userProfile?.teamId;
+              const opponentId = isHome ? match.awayTeamId : match.homeTeamId;
+              const opponentTeam = opponentTeams[opponentId];
               const opponent = isHome ? match.awayTeamName : match.homeTeamName;
               const matchDate = toDate(match.scheduledDate);
               const location = match.locationOverride || match.location;
+
+              // Detectar si hay sustituto en el equipo rival
+              const hasSubstitute = match.substituteTeamId === opponentId && match.substitutePlayer1Name;
+
               return (
                 <div key={match.id} className="score-card" style={{ marginBottom: 10 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                        <span className={`badge ${isHome ? 'badge-teal' : 'badge-purple'}`}>{isHome ? '🏠 Local' : '✈️ Visitante'}</span>
-                        <span style={{ fontSize: 12, color: 'var(--text2)' }}>Jornada {match.round}</span>
-                      </div>
-                      <p style={{ fontWeight: 800, fontSize: 18 }}>vs {opponent}</p>
-                      <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <p style={{ fontSize: 13, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <Clock size={12} />{formatDayName(matchDate)} · {formatDate(matchDate, 'HH:mm')}h
-                        </p>
-                        <p style={{ fontSize: 13, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <MapPin size={12} />{location}
-                        </p>
+                  {/* Cabecera */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <span className={`badge ${isHome ? 'badge-teal' : 'badge-purple'}`}>{isHome ? '🏠 Local' : '✈️ Visitante'}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text2)' }}>Jornada {match.round}</span>
+                  </div>
+
+                  {/* Nombre rival */}
+                  <p style={{ fontWeight: 800, fontSize: 20, marginBottom: 12 }}>vs {opponent}</p>
+
+                  {/* Jugadores rivales */}
+                  {opponentTeam && (
+                    <div style={{ background: 'rgba(124,58,237,0.08)', border: '1px solid rgba(124,58,237,0.2)', borderRadius: 10, padding: '10px 14px', marginBottom: 12 }}>
+                      <p style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent2)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>
+                        🎾 Jugadores rivales
+                      </p>
+                      <div style={{ display: 'flex', gap: 16 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <User size={12} color="var(--text2)" />
+                          <span style={{ fontSize: 13, fontWeight: 600 }}>{opponentTeam.player1Name || '—'}</span>
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <User size={12} color="var(--text2)" />
+                          <span style={{ fontSize: 13, fontWeight: 600 }}>
+                            {hasSubstitute
+                              ? <span style={{ color: 'var(--warning)' }}>⚠️ {match.substitutePlayer1Name} <span style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 400 }}>(sustituto)</span></span>
+                              : opponentTeam.player2Name || '—'
+                            }
+                          </span>
+                        </div>
                       </div>
                     </div>
+                  )}
+
+                  {/* Fecha y ubicación */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <p style={{ fontSize: 13, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Clock size={12} />{formatDayName(matchDate)} · {formatDate(matchDate, 'HH:mm')}h
+                    </p>
+                    <p style={{ fontSize: 13, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <MapPin size={12} />{location}
+                    </p>
                   </div>
+
+                  <Link href="/dashboard/schedule" style={{ display: 'block', marginTop: 12, textAlign: 'center', fontSize: 13, color: 'var(--accent)', textDecoration: 'none', fontWeight: 600 }}>
+                    Ver detalles →
+                  </Link>
                 </div>
               );
             })}
@@ -196,7 +246,7 @@ export default function DashboardPage() {
                 return (
                   <div key={s.teamId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '13px 16px', borderBottom: i < 4 ? '1px solid var(--border)' : 'none', background: isMe ? 'rgba(0,229,160,0.06)' : 'transparent' }}>
                     <div style={{ width: 24, textAlign: 'center', fontWeight: 800, fontSize: 14, color: i === 0 ? 'var(--accent3)' : i === 1 ? '#c0c0c0' : i === 2 ? '#cd7f32' : 'var(--text2)' }}>
-                      {i + 1}
+                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : s.position}
                     </div>
                     <div style={{ flex: 1 }}>
                       <span style={{ fontWeight: isMe ? 700 : 500, fontSize: 14, color: isMe ? 'var(--accent)' : 'var(--text)' }}>{s.teamName}</span>
