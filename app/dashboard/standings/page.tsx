@@ -12,6 +12,7 @@ export default function StandingsPage() {
   const [champ, setChamp] = useState<Championship | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [popupY, setPopupY] = useState(0);
 
   useEffect(() => { loadData(); }, []);
 
@@ -69,7 +70,7 @@ export default function StandingsPage() {
             return (
               <div
                 key={s.teamId}
-                onClick={() => setSelectedTeamId(isSelected ? null : s.teamId)}
+                onClick={(e) => { const rect = (e.currentTarget as HTMLElement).getBoundingClientRect(); setPopupY(rect.top); setSelectedTeamId(isSelected ? null : s.teamId); }}
                 style={{
                   display: 'grid',
                   gridTemplateColumns: '28px 1fr 36px 36px 36px 36px 44px',
@@ -126,7 +127,7 @@ export default function StandingsPage() {
       {/* Team players tooltip */}
       {selectedTeam && selectedStanding && (
         <div
-          style={{ position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)', zIndex: 200, background: 'var(--surface)', border: '1px solid rgba(124,58,237,0.4)', borderRadius: 14, padding: '12px 16px', minWidth: 200, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
+          style={{ position: 'fixed', top: Math.max(60, popupY - 90), left: '50%', transform: 'translateX(-50%)', zIndex: 200, background: 'var(--surface)', border: '1px solid rgba(124,58,237,0.4)', borderRadius: 14, padding: '12px 16px', minWidth: 200, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
           onClick={() => setSelectedTeamId(null)}
         >
           <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent2)', marginBottom: 8 }}>{selectedTeam.name}</p>
