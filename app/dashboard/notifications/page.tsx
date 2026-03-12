@@ -1,10 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { getUserNotifications, markNotificationRead } from '@/lib/firestore';
+import { getUserNotifications, markNotificationRead, deleteNotification, deleteAllUserNotifications } from '@/lib/firestore';
 import { Notification } from '@/types';
 import { formatRelative } from '@/lib/utils';
-import { Bell, CheckCheck } from 'lucide-react';
+import { Bell, CheckCheck, Trash2, X } from 'lucide-react';
 
 const ICONS: Record<string, string> = {
   match_reminder: '⏰',
@@ -19,6 +19,7 @@ export default function NotificationsPage() {
   const { user } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -46,6 +47,23 @@ export default function NotificationsPage() {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
   }
 
+  async function handleDelete(id: string) {
+    await deleteNotification(id);
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  }
+
+  async function handleDeleteAll() {
+    if (!user) return;
+    if (!confirm('¿Eliminar todas tus notificaciones?')) return;
+    setDeleting(true);
+    try {
+      await deleteAllUserNotifications(user.uid);
+      setNotifications([]);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
@@ -60,10 +78,17 @@ export default function NotificationsPage() {
             </span>
           )}
         </h1>
-        {unreadCount > 0 && (
-          <button onClick={handleMarkAllRead} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}>
-            <CheckCheck size={14} /> Todas leídas
-          </button>
+        {notifications.length > 0 && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            {unreadCount > 0 && (
+              <button onClick={handleMarkAllRead} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--accent)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <CheckCheck size={14} /> Leídas
+              </button>
+            )}
+            <button onClick={handleDeleteAll} disabled={deleting} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Trash2 size={14} /> Limpiar
+            </button>
+          </div>
         )}
       </div>
 
@@ -80,26 +105,35 @@ export default function NotificationsPage() {
             {notifications.map((n, i) => (
               <div
                 key={n.id}
-                onClick={() => !n.read && handleMarkRead(n.id)}
                 style={{
-                  padding: '16px',
+                  padding: '14px 16px',
                   borderBottom: i < notifications.length - 1 ? '1px solid var(--border)' : 'none',
                   background: n.read ? 'transparent' : 'rgba(0,229,160,0.04)',
-                  cursor: n.read ? 'default' : 'pointer',
                   display: 'flex',
                   gap: 12,
                   alignItems: 'flex-start',
                 }}
               >
-                <div style={{ fontSize: 24, lineHeight: 1, flexShrink: 0 }}>{ICONS[n.type] || '📢'}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                    <p style={{ fontWeight: n.read ? 500 : 700, fontSize: 14, lineHeight: 1.4 }}>{n.title}</p>
-                    {!n.read && <div className="pulse-dot" style={{ flexShrink: 0, marginTop: 4 }} />}
+                <div
+                  onClick={() => !n.read && handleMarkRead(n.id)}
+                  style={{ flex: 1, display: 'flex', gap: 12, cursor: n.read ? 'default' : 'pointer' }}
+                >
+                  <div style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>{ICONS[n.type] || '📢'}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                      <p style={{ fontWeight: n.read ? 500 : 700, fontSize: 14, lineHeight: 1.4 }}>{n.title}</p>
+                      {!n.read && <div className="pulse-dot" style={{ flexShrink: 0, marginTop: 4 }} />}
+                    </div>
+                    <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 4, lineHeight: 1.5 }}>{n.message}</p>
+                    <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 6, opacity: 0.7 }}>{formatRelative(n.createdAt)}</p>
                   </div>
-                  <p style={{ fontSize: 13, color: 'var(--text2)', marginTop: 4, lineHeight: 1.5 }}>{n.message}</p>
-                  <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 6, opacity: 0.7 }}>{formatRelative(n.createdAt)}</p>
                 </div>
+                <button
+                  onClick={() => handleDelete(n.id)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)', padding: '2px', flexShrink: 0, opacity: 0.5 }}
+                >
+                  <X size={16} />
+                </button>
               </div>
             ))}
           </div>
