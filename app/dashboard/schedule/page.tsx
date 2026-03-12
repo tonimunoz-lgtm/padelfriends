@@ -115,11 +115,8 @@ export default function SchedulePage() {
       }
 
       // Actualizar partido
-      const updateData: Partial<Match> = { status: 'postponed' };
-      if (newScheduledDate) {
-        updateData.scheduledDate = newScheduledDate as unknown as Date;
-        updateData.status = 'scheduled'; // Reprogramado sigue como scheduled
-      }
+      const updateData: any = { status: postponeType === 'reschedule' ? 'scheduled' : 'postponed' };
+      if (newScheduledDate) updateData.scheduledDate = newScheduledDate;
       await updateMatch(postponeModal.id, updateData);
 
       // Notificar a los jugadores del equipo rival
@@ -195,6 +192,9 @@ export default function SchedulePage() {
 
   const canPostpone = (m: Match) =>
     (m.homeTeamId === userProfile?.teamId || m.awayTeamId === userProfile?.teamId) && m.status === 'scheduled';
+
+  const canReschedule = (m: Match) =>
+    (m.homeTeamId === userProfile?.teamId || m.awayTeamId === userProfile?.teamId) && m.status === 'postponed';
 
   function renderPlayers(match: Match) {
     const homeTeam = teams[match.homeTeamId];
@@ -345,6 +345,14 @@ export default function SchedulePage() {
                   <button className="btn-secondary" style={{ fontSize: 13, padding: '10px 16px', flex: 1 }}
                     onClick={e => { e.stopPropagation(); setLocationModal(match); setNewLocation(location); }}>
                     <Edit3 size={14} /> Ubicación
+                  </button>
+                )}
+                {canReschedule(match) && (
+                  <button
+                    onClick={e => { e.stopPropagation(); setPostponeModal(match); setPostponeType('reschedule'); setNewDate(''); setNewTime(''); }}
+                    style={{ fontSize: 13, padding: '10px 16px', flex: 1, background: 'rgba(0,229,160,0.1)', border: '1px solid rgba(0,229,160,0.3)', borderRadius: 12, cursor: 'pointer', color: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontWeight: 600 }}
+                  >
+                    <Calendar size={14} /> Reprogramar
                   </button>
                 )}
                 {canPostpone(match) && (
