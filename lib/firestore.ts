@@ -417,6 +417,26 @@ export async function markNotificationRead(id: string) {
   await updateDoc(doc(db, 'notifications', id), { read: true });
 }
 
+export async function deleteNotification(id: string) {
+  await deleteDoc(doc(db, 'notifications', id));
+}
+
+export async function deleteAllUserNotifications(userId: string) {
+  const snap = await getDocs(query(collection(db, 'notifications'), where('userId', '==', userId)));
+  const batch = writeBatch(db);
+  snap.docs.forEach(d => batch.delete(d.ref));
+  await batch.commit();
+  return snap.size;
+}
+
+export async function deleteAllNotifications() {
+  const snap = await getDocs(collection(db, 'notifications'));
+  const batch = writeBatch(db);
+  snap.docs.forEach(d => batch.delete(d.ref));
+  await batch.commit();
+  return snap.size;
+}
+
 // --- STANDINGS ---
 export async function getStandings(championshipId: string): Promise<Standings[]> {
   const championship = await getDoc(doc(db, 'championships', championshipId));
