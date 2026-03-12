@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { getActiveChampionship, getStandings, getTeam } from '@/lib/firestore';
 import { Standings, Team, Championship } from '@/types';
-import { Trophy, User, X, MapPin } from 'lucide-react';
+import { Trophy, User } from 'lucide-react';
 
 export default function StandingsPage() {
   const { userProfile } = useAuth();
@@ -123,84 +123,20 @@ export default function StandingsPage() {
         </div>
       </div>
 
-      {/* Team detail modal */}
+      {/* Team players tooltip */}
       {selectedTeam && selectedStanding && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 200, display: 'flex', alignItems: 'flex-end' }}
-          onClick={() => setSelectedTeamId(null)}>
-          <div className="card" style={{ width: '100%', borderRadius: '20px 20px 0 0', maxHeight: '70vh', overflowY: 'auto' }}
-            onClick={e => e.stopPropagation()}>
-
-            {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <span style={{ fontSize: 22 }}>
-                    {selectedStanding.position === 1 ? '🥇' : selectedStanding.position === 2 ? '🥈' : selectedStanding.position === 3 ? '🥉' : `${selectedStanding.position}º`}
-                  </span>
-                  <h3 style={{ fontSize: 20, fontWeight: 800 }}>{selectedTeam.name}</h3>
-                  {selectedTeam.id === userProfile?.teamId && (
-                    <span className="badge badge-teal" style={{ fontSize: 10 }}>Mi equipo</span>
-                  )}
-                </div>
-                {selectedTeam.clubName && (
-                  <p style={{ fontSize: 13, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <MapPin size={12} /> {selectedTeam.clubName}
-                  </p>
-                )}
+        <div
+          style={{ position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)', zIndex: 200, background: 'var(--surface)', border: '1px solid rgba(124,58,237,0.4)', borderRadius: 14, padding: '12px 16px', minWidth: 200, boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}
+          onClick={() => setSelectedTeamId(null)}
+        >
+          <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--accent2)', marginBottom: 8 }}>{selectedTeam.name}</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {[selectedTeam.player1Name, selectedTeam.player2Name].filter(Boolean).map((name, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <User size={13} color="var(--text2)" />
+                <span style={{ fontSize: 14, fontWeight: 500 }}>{name}</span>
               </div>
-              <button onClick={() => setSelectedTeamId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text2)' }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Players */}
-            <div style={{ marginBottom: 20 }}>
-              <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent2)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>🎾 Jugadores</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {[
-                  { name: selectedTeam.player1Name, email: selectedTeam.player1Email },
-                  { name: selectedTeam.player2Name, email: selectedTeam.player2Email },
-                ].filter(p => p.name).map((player, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, background: 'var(--surface2)', borderRadius: 10, padding: '12px 14px' }}>
-                    <div style={{ width: 36, height: 36, borderRadius: 10, background: i === 0 ? 'rgba(0,229,160,0.15)' : 'rgba(124,58,237,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <User size={18} color={i === 0 ? 'var(--accent)' : 'var(--accent2)'} />
-                    </div>
-                    <div>
-                      <p style={{ fontWeight: 600, fontSize: 15 }}>{player.name}</p>
-                      {player.email && <p style={{ fontSize: 12, color: 'var(--text2)' }}>{player.email}</p>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Stats */}
-            <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>📊 Estadísticas</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginBottom: 16 }}>
-              {[
-                { label: 'Puntos', value: selectedStanding.points, color: 'var(--accent)' },
-                { label: 'Victorias', value: selectedStanding.wins, color: 'var(--success)' },
-                { label: 'Empates', value: selectedStanding.draws, color: 'var(--warning)' },
-                { label: 'Derrotas', value: selectedStanding.losses, color: 'var(--danger)' },
-              ].map(stat => (
-                <div key={stat.label} style={{ background: 'var(--surface2)', borderRadius: 10, padding: '12px 8px', textAlign: 'center' }}>
-                  <p style={{ fontSize: 22, fontWeight: 800, color: stat.color, fontFamily: 'Space Mono, monospace' }}>{stat.value}</p>
-                  <p style={{ fontSize: 10, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>{stat.label}</p>
-                </div>
-              ))}
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-              {[
-                { label: 'Jugados', value: selectedStanding.matchesPlayed },
-                { label: 'Sets ganados', value: selectedStanding.setsWon },
-                { label: 'Dif. sets', value: selectedStanding.setsDiff > 0 ? `+${selectedStanding.setsDiff}` : selectedStanding.setsDiff },
-              ].map(stat => (
-                <div key={stat.label} style={{ background: 'var(--surface2)', borderRadius: 10, padding: '12px 8px', textAlign: 'center' }}>
-                  <p style={{ fontSize: 18, fontWeight: 700, color: 'var(--text)', fontFamily: 'Space Mono, monospace' }}>{stat.value}</p>
-                  <p style={{ fontSize: 10, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 2 }}>{stat.label}</p>
-                </div>
-              ))}
-            </div>
+            ))}
           </div>
         </div>
       )}
