@@ -66,6 +66,18 @@ export async function getAllTeams(): Promise<Team[]> {
 
 export async function updateTeam(id: string, data: Partial<Team>) {
   await updateDoc(doc(db, 'teams', id), data as Record<string, unknown>);
+
+  // Sync team name in all future scheduled/postponed matches
+  if (data.name) {
+    const [homeSnap, awaySnap] = await Promise.all([
+      getDocs(query(collection(db, 'matches'), where('homeTeamId', '==', id), where('status', 'in', ['scheduled', 'postponed']))),
+      getDocs(query(collection(db, 'matches'), where('awayTeamId', '==', id), where('status', 'in', ['scheduled', 'postponed']))),
+    ]);
+    const batch = writeBatch(db);
+    homeSnap.docs.forEach(d => batch.update(d.ref, { homeTeamName: data.name }));
+    awaySnap.docs.forEach(d => batch.update(d.ref, { awayTeamName: data.name }));
+    await batch.commit();
+  }
 }
 
 export async function deleteTeam(id: string) {
@@ -93,6 +105,25 @@ export async function getActiveChampionship(): Promise<Championship | null> {
 
 export async function updateChampionship(id: string, data: Partial<Championship>) {
   await updateDoc(doc(db, 'championships', id), data as Record<string, unknown>);
+}
+
+export async function deleteMatchesByChampionship(championshipId: string) {
+  const snap = await getDocs(query(collection(db, 'matches'), where('championshipId', '==', championshipId)));
+  const batch = writeBatch(db);
+  snap.docs.forEach(d => batch.delete(d.ref));
+  await batch.commit();
+  return snap.size;
+}
+
+export async function resetTeamStats(teamIds: string[]) {
+  const batch = writeBatch(db);
+  for (const id of teamIds) {
+    batch.update(doc(db, 'teams', id), {
+      points: 0, matchesPlayed: 0, wins: 0, draws: 0, losses: 0,
+      setsWon: 0, setsLost: 0, gamesWon: 0, gamesLost: 0,
+    });
+  }
+  await batch.commit();
 }
 
 // --- MATCHES ---
