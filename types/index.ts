@@ -44,6 +44,9 @@ export interface Championship {
   totalRounds: number;
   createdAt: Date;
   description?: string;
+  pointsWin: number;
+  pointsDraw: number;
+  pointsLoss: number;
 }
 
 export interface Match {
