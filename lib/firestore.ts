@@ -412,6 +412,7 @@ export async function getStandings(championshipId: string): Promise<Standings[]>
     .sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points;
       if (b.wins !== a.wins) return b.wins - a.wins;
+      if (b.setsWon !== a.setsWon) return b.setsWon - a.setsWon;
       return b.setsDiff - a.setsDiff;
     })
     .map((s, i) => ({ ...s, position: i + 1 }));
